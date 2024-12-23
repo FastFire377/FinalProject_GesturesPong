@@ -1,11 +1,20 @@
 import cv2 as cv
 from mediapipe.python.solutions.holistic import Holistic
+import mediapipe
 
 
 class MediaPipe:
     def __init__(self, video_source=0):
-        self.holistic = Holistic()
         self.cap = cv.VideoCapture(video_source)
+        
+        self.mp_holistic = mediapipe.solutions.holistic
+        self.holistic_model = self.mp_holistic.Holistic(
+            min_detection_confidence=0.5,
+            min_tracking_confidence=0.5
+        )
+        
+        # Initializing the drawing utils for drawing the facial landmarks on image
+        self.mp_drawing = mediapipe.solutions.drawing_utils
 
 
     def draw_fps(self, t_start, frame):
@@ -26,8 +35,38 @@ class MediaPipe:
 
 
     def process_frame(self, frame):
-        results = self.holistic.process(cv.cvtColor(frame, cv.COLOR_BGR2RGB))
-
+        results = self.holistic_model.process(frame)
+        
+        self.mp_drawing.draw_landmarks(
+            frame,
+            results.face_landmarks,
+            self.mp_holistic.FACEMESH_CONTOURS,
+            self.mp_drawing.DrawingSpec(
+                color=(255,0,255),
+                thickness=1,
+                circle_radius=1
+            ),
+            self.mp_drawing.DrawingSpec(
+                color=(0,255,255),
+                thickness=1,
+                circle_radius=1
+            )
+        )
+    
+        # Drawing Right hand Land Marks
+        self.mp_drawing.draw_landmarks(
+        frame, 
+        results.right_hand_landmarks, 
+        self.mp_holistic.HAND_CONNECTIONS
+        )
+    
+        # Drawing Left hand Land Marks
+        self.mp_drawing.draw_landmarks(
+        frame, 
+        results.left_hand_landmarks, 
+        self.mp_holistic.HAND_CONNECTIONS
+        )
+        
         return frame
 
 
