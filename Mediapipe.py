@@ -1,97 +1,94 @@
-import cv2 as cv
-from mediapipe.python.solutions.holistic import Holistic
-import mediapipe
+import cv2
+import mediapipe as mp
+from mediapipe.tasks import python
+import threading 
 
-
-class MediaPipe:
-    def __init__(self, video_source=0):
-        self.cap = cv.VideoCapture(video_source)
+class GestureRecognizer:
+    def main(self):
+        num_hands = 2
+        model_path = "C:/Users/admin/OneDrive - Universidade do Algarve/EngenhariaSistemasTecnologiasInformaticas/ComputacaoVisual/ProjetoFinal/repoClone/FinalProject_GesturesPong/model/gesture_recognizer.task"
+        GestureRecognizer = mp.tasks.vision.GestureRecognizer
+        GestureRecognizerOptions = mp.tasks.vision.GestureRecognizerOptions
+        VisionRunningMode = mp.tasks.vision.RunningMode
         
-        self.mp_holistic = mediapipe.solutions.holistic
-        self.holistic_model = self.mp_holistic.Holistic(
-            min_detection_confidence=0.5,
-            min_tracking_confidence=0.5
-        )
-        
-        # Initializing the drawing utils for drawing the facial landmarks on image
-        self.mp_drawing = mediapipe.solutions.drawing_utils
+        """
+        0 - Unrecognized gesture, label: Unknown
+        1 - Closed fist, label: Closed_Fist
+        2 - Open palm, label: Open_Palm
+        3 - Pointing up, label: Pointing_Up
+        4 - Thumbs down, label: Thumb_Down
+        5 - Thumbs up, label: Thumb_Up
+        6 - Victory, label: Victory
+        7 - Love, label: ILoveYou
+        """
 
+        self.lock = threading.Lock()
+        self.current_gestures = []
+        options = GestureRecognizerOptions(
+            base_options=python.BaseOptions(model_asset_path=model_path),
+            running_mode=VisionRunningMode.LIVE_STREAM,
+            num_hands = num_hands,
+            result_callback=self.__result_callback)
+        recognizer = GestureRecognizer.create_from_options(options)
 
-    def draw_fps(self, t_start, frame):
-        """Calcula e desenha FPS"""
-        t_end = cv.getTickCount()
-        fps = cv.getTickFrequency() / (t_end - t_start)
+        timestamp = 0 
+        mp_drawing = mp.solutions.drawing_utils
+        mp_hands = mp.solutions.hands
+        hands = mp_hands.Hands(
+                static_image_mode=False,
+                max_num_hands=num_hands,
+                min_detection_confidence=0.65,
+                min_tracking_confidence=0.65)
 
-        cv.putText(
-            frame,
-            f"FPS: {fps:.1f}",
-            (10, 25),
-            cv.FONT_HERSHEY_SIMPLEX,
-            fontScale=0.8,
-            color=(0, 128, 26),
-            thickness=1,
-            lineType=cv.LINE_AA,
-        )
+        cap = cv2.VideoCapture(0)
 
+        while cv2.pollKey() == -1: # cv2.waitKey(1) & 0xFF == 27
+            ret, frame = cap.read()
+            if not ret:
+                break
+            
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            results = hands.process(frame)
+            frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+            np_array = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            
+            if results.multi_hand_landmarks:
+                for hand_landmarks in results.multi_hand_landmarks:
+                    mp_drawing.draw_landmarks(frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
+                    mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=np_array)
+                    recognizer.recognize_async(mp_image, timestamp)
+                    timestamp = timestamp + 1 # should be monotonically increasing, because in LIVE_STREAM mode
+                    
+                self.put_gestures(frame)
 
-    def process_frame(self, frame):
-        results = self.holistic_model.process(frame)
-        
-        self.mp_drawing.draw_landmarks(
-            frame,
-            results.face_landmarks,
-            self.mp_holistic.FACEMESH_CONTOURS,
-            self.mp_drawing.DrawingSpec(
-                color=(255,0,255),
-                thickness=1,
-                circle_radius=1
-            ),
-            self.mp_drawing.DrawingSpec(
-                color=(0,255,255),
-                thickness=1,
-                circle_radius=1
-            )
-        )
-    
-        # Drawing Right hand Land Marks
-        self.mp_drawing.draw_landmarks(
-        frame, 
-        results.right_hand_landmarks, 
-        self.mp_holistic.HAND_CONNECTIONS
-        )
-    
-        # Drawing Left hand Land Marks
-        self.mp_drawing.draw_landmarks(
-        frame, 
-        results.left_hand_landmarks, 
-        self.mp_holistic.HAND_CONNECTIONS
-        )
-        
-        return frame
+            cv2.imshow('MediaPipe Hands', frame)
+            
 
+        cap.release()
 
+    def put_gestures(self, frame):
+        self.lock.acquire()
+        gestures = self.current_gestures
+        self.lock.release()
+        y_pos = 50
+        for hand_gesture_name in gestures:
+            # show the prediction on the frame
+            cv2.putText(frame, hand_gesture_name, (10, y_pos), cv2.FONT_HERSHEY_SIMPLEX, 
+                                1, (0,0,255), 2, cv2.LINE_AA)
+            y_pos += 50
 
-    def run(self):
-        try:
-            while cv.pollKey() == -1:
-                t_start = cv.getTickCount()
+    def __result_callback(self, result, output_image, timestamp_ms):
+        #print(f'gesture recognition result: {result}')
+        self.lock.acquire() # solves potential concurrency issues
+        self.current_gestures = []
+        """if result is not None and any(result.gestures):
+            print("Recognized gestures:")
+            for single_hand_gesture_data in result.gestures:
+                gesture_name = single_hand_gesture_data[0].category_name
+                print(gesture_name)
+                self.current_gestures.append(gesture_name)"""
+        self.lock.release()
 
-                success, frame = self.cap.read()
-                if not success:
-                    print("Ignoring empty camera frame.")
-                    continue
-
-                frame = self.process_frame(frame)
-                self.draw_fps(t_start, frame)
-                cv.imshow("MediaPipe", frame)
-
-        finally:
-            self.cap.release()
-            cv.destroyAllWindows()
-
-
-# Executa o programa
 if __name__ == "__main__":
-
-    mediapipe = MediaPipe(video_source=0)
-    mediapipe.run()
+    rec = GestureRecognizer()
+    rec.main()
