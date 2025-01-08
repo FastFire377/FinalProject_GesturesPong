@@ -8,7 +8,7 @@ import time
 
 class GestureRecognizer:
     def __init__(self, images):
-        self.images
+        self.images = images
         self.lock = threading.Lock()
         self.current_gestures = []
         self.selected_option = None
