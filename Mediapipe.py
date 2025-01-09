@@ -85,11 +85,19 @@ class GestureRecognizer:
     def display_menu(self, frame):
         # Display menu options
         y_pos = 50
-        for gesture, option in self.options.items():
-            cv2.putText(frame, f"{gesture}: {option}", (10, y_pos), cv2.FONT_HERSHEY_SIMPLEX, 
-                        1, (255, 255, 255), 2, cv2.LINE_AA)
-            y_pos += 50
-        frame[100:150 + 10, 100:100 + 10] = images
+        
+
+
+        # Redimensionar a imagem para caber na região desejada (10x60)
+        jogar_button = cv2.resize(self.images["JogarButton"], (200, 150))  # Largura x Altura
+
+        # Converter para RGB, se necessário
+        if jogar_button.shape[2] == 4:  # Verifica se tem canal alfa (RGBA)
+            resized_button = cv2.cvtColor(jogar_button, cv2.COLOR_RGBA2RGB)
+
+        # Inserir na região do frame
+        frame[150:300, 300:500] = resized_button
+        
         # Display the selected option
         if self.selected_option:
             cv2.putText(frame, f"Selected: {self.selected_option}", (10, y_pos + 20),
@@ -145,7 +153,7 @@ class GestureRecognizer:
 
 if __name__ == "__main__":
     images = {}
-    images_path = "images/"
+    images_path = "FinalProject_GesturesPong/images/"
     for images_file in glob.glob(os.path.join(images_path, "*.png")):
         images_name = os.path.splitext(os.path.basename(images_file))[0]
         print("image name:", images_name)
