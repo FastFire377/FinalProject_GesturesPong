@@ -1,10 +1,12 @@
 import glob
 import os
 import cv2
+import cvzone.FPS
 import mediapipe as mp
 from mediapipe.tasks import python
 import threading
 import time 
+from cvzoneFPS import FPS
 
 class GestureRecognizer:
     def __init__(self, images):
@@ -19,6 +21,13 @@ class GestureRecognizer:
             "Victory": "Pontuações",
             "Thumb_Down": "Créditos"
         }
+        """self.img_shapes = {
+            "jogar": self.images["JogarButton"].shape,
+            "creditos": self.images["CreditosButton"].shape,
+            "Pontuação": self.images["PontuaçãoButton"].shape
+        }
+        self.frame_shape - self.img_shapes["jogar"] """
+        self.fpsCounter = FPS
     
     def main(self):
         num_hands = 2
@@ -86,17 +95,9 @@ class GestureRecognizer:
         # Display menu options
         y_pos = 50
         
-
-
-        # Redimensionar a imagem para caber na região desejada (10x60)
-        jogar_button = cv2.resize(self.images["JogarButton"], (200, 150))  # Largura x Altura
-
-        # Converter para RGB, se necessário
-        if jogar_button.shape[2] == 4:  # Verifica se tem canal alfa (RGBA)
-            resized_button = cv2.cvtColor(jogar_button, cv2.COLOR_RGBA2RGB)
-
-        # Inserir na região do frame
-        frame[150:300, 300:500] = resized_button
+        _, frame = self.fpsCounter.update(frame)
+        
+        frame = cvzone.overlayPNG(frame, self.images["JogarButton"], [150, 50])
         
         # Display the selected option
         if self.selected_option:
