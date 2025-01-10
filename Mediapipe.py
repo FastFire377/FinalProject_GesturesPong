@@ -1,12 +1,13 @@
 import glob
 import os
 import cv2
-import cvzone.FPS
+import cvzone
 import mediapipe as mp
 from mediapipe.tasks import python
 import threading
-import time 
-from cvzoneFPS import FPS
+from cvzone.HandTrackingModule import HandDetector
+import numpy as np
+import time
 
 class GestureRecognizer:
     def __init__(self, images):
@@ -16,25 +17,26 @@ class GestureRecognizer:
         self.selected_option = None
         self.start_time = None
         self.required_duration = 2  # manter gesto por 2 segundos
+        self.menu = True #Display menu boolean
         self.options = {
             "Thumb_Up": "Jogar",
-            "Victory": "Pontuações",
-            "Thumb_Down": "Créditos"
+            "Victory": "Pontuacao",
+            "Thumb_Down": "Creditos"
         }
-        """self.img_shapes = {
-            "jogar": self.images["JogarButton"].shape,
-            "creditos": self.images["CreditosButton"].shape,
-            "Pontuação": self.images["PontuaçãoButton"].shape
-        }
-        self.frame_shape - self.img_shapes["jogar"] """
-        self.fpsCounter = FPS
-    
+        
     def main(self):
         num_hands = 2
         model_path = "C:/Users/admin/OneDrive - Universidade do Algarve/EngenhariaSistemasTecnologiasInformaticas/ComputacaoVisual/ProjetoFinal/repoClone/FinalProject_GesturesPong/model/gesture_recognizer.task"
         GestureRecognizer = mp.tasks.vision.GestureRecognizer
         GestureRecognizerOptions = mp.tasks.vision.GestureRecognizerOptions
         VisionRunningMode = mp.tasks.vision.RunningMode
+        
+        # Importing all images
+        imgBackground = cv2.imread("FinalProject_GesturesPong/images/backgroundPong.png")
+        imgGameOver = cv2.imread("FinalProject_GesturesPong/images/GameOver.png")
+        imgBall = cv2.imread("FinalProject_GesturesPong/images/bolaresize.png", cv2.IMREAD_UNCHANGED)
+        imgBlock1 = cv2.imread("FinalProject_GesturesPong/images/Bloco1.png", cv2.IMREAD_UNCHANGED)
+        imgBlock2 = cv2.imread("FinalProject_GesturesPong/images/Bloco2.png", cv2.IMREAD_UNCHANGED)
         
         """
         0 - Unrecognized gesture, label: Unknown
@@ -62,8 +64,11 @@ class GestureRecognizer:
                 max_num_hands=num_hands,
                 min_detection_confidence=0.65,
                 min_tracking_confidence=0.65)
+        
 
         cap = cv2.VideoCapture(0)
+        cap.set(3, 1280)
+        cap.set(4, 720)
 
         while cv2.pollKey() == -1: # cv2.waitKey(1) & 0xFF == 27
             ret, frame = cap.read()
@@ -83,8 +88,8 @@ class GestureRecognizer:
                     timestamp = timestamp + 1 # should be monotonically increasing, because in LIVE_STREAM mode
                     
                 self.put_gestures(frame)
-                
-            self.display_menu(frame)
+            if self.menu:
+                self.display_menu(frame)
             cv2.imshow('MediaPipe Hands', frame)
             
 
@@ -95,9 +100,9 @@ class GestureRecognizer:
         # Display menu options
         y_pos = 50
         
-        _, frame = self.fpsCounter.update(frame)
-        
-        frame = cvzone.overlayPNG(frame, self.images["JogarButton"], [150, 50])
+        frame = cvzone.overlayPNG(frame, self.images["JogarButton"], [310, -50])
+        frame = cvzone.overlayPNG(frame, self.images["PontuacaoButton"], [280, 160])
+        frame = cvzone.overlayPNG(frame, self.images["CreditosButton"], [280, 420])
         
         # Display the selected option
         if self.selected_option:
