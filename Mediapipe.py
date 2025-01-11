@@ -16,29 +16,16 @@ class GestureRecognizer:
         self.current_gestures = []
         self.selected_option = None
         self.start_time = None
-        self.required_duration = 2  # manter gesto por 2 segundos
+        self.required_duration = 1.5  # manter gesto por 2 segundos
         self.menu = True #Display menu boolean
-        self.options = {
+        self.menuOptions = {
             "Thumb_Up": "Jogar",
             "Victory": "Pontuacao",
             "Thumb_Down": "Creditos"
         }
         
-    def main(self):
-        num_hands = 2
-        model_path = "C:/Users/admin/OneDrive - Universidade do Algarve/EngenhariaSistemasTecnologiasInformaticas/ComputacaoVisual/ProjetoFinal/repoClone/FinalProject_GesturesPong/model/gesture_recognizer.task"
-        GestureRecognizer = mp.tasks.vision.GestureRecognizer
-        GestureRecognizerOptions = mp.tasks.vision.GestureRecognizerOptions
-        VisionRunningMode = mp.tasks.vision.RunningMode
-        
-        # Importing all images
-        imgBackground = cv2.imread("FinalProject_GesturesPong/images/backgroundPong.png")
-        imgGameOver = cv2.imread("FinalProject_GesturesPong/images/GameOver.png")
-        imgBall = cv2.imread("FinalProject_GesturesPong/images/bolaresize.png", cv2.IMREAD_UNCHANGED)
-        imgBlock1 = cv2.imread("FinalProject_GesturesPong/images/Bloco1.png", cv2.IMREAD_UNCHANGED)
-        imgBlock2 = cv2.imread("FinalProject_GesturesPong/images/Bloco2.png", cv2.IMREAD_UNCHANGED)
-        
         """
+        Possible Gestures by mediapipe:
         0 - Unrecognized gesture, label: Unknown
         1 - Closed fist, label: Closed_Fist
         2 - Open palm, label: Open_Palm
@@ -49,43 +36,49 @@ class GestureRecognizer:
         7 - Love, label: ILoveYou
         """
         
-        options = GestureRecognizerOptions(
+        num_hands = 2
+        model_path = "FinalProject_GesturesPong/model/gesture_recognizer.task"
+        GestureRecognizer = mp.tasks.vision.GestureRecognizer
+        GestureRecognizerOptions = mp.tasks.vision.GestureRecognizerOptions
+        VisionRunningMode = mp.tasks.vision.RunningMode
+        
+        self.options = GestureRecognizerOptions(
             base_options=python.BaseOptions(model_asset_path=model_path),
             running_mode=VisionRunningMode.LIVE_STREAM,
             num_hands = num_hands,
             result_callback=self.__result_callback)
-        recognizer = GestureRecognizer.create_from_options(options)
+        self.recognizer = GestureRecognizer.create_from_options(self.options)
 
-        timestamp = 0 
-        mp_drawing = mp.solutions.drawing_utils
-        mp_hands = mp.solutions.hands
-        hands = mp_hands.Hands(
+        self.timestamp = 0 
+        self.mp_drawing = mp.solutions.drawing_utils
+        self.mp_hands = mp.solutions.hands
+        self.hands = self.mp_hands.Hands(
                 static_image_mode=False,
                 max_num_hands=num_hands,
                 min_detection_confidence=0.65,
                 min_tracking_confidence=0.65)
         
-
-        cap = cv2.VideoCapture(0)
-        cap.set(3, 1280)
-        cap.set(4, 720)
-
+        self.cap = cv2.VideoCapture(0)
+        self.cap.set(3, 1280)
+        self.cap.set(4, 720)
+        
+    def main(self):
         while cv2.pollKey() == -1: # cv2.waitKey(1) & 0xFF == 27
-            ret, frame = cap.read()
+            ret, frame = self.cap.read()
             if not ret:
                 break
             
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            results = hands.process(frame)
+            results = self.hands.process(frame)
             frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
             np_array = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             
             if results.multi_hand_landmarks:
                 for hand_landmarks in results.multi_hand_landmarks:
-                    mp_drawing.draw_landmarks(frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
+                    self.mp_drawing.draw_landmarks(frame, hand_landmarks, self.mp_hands.HAND_CONNECTIONS)
                     mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=np_array)
-                    recognizer.recognize_async(mp_image, timestamp)
-                    timestamp = timestamp + 1 # should be monotonically increasing, because in LIVE_STREAM mode
+                    self.recognizer.recognize_async(mp_image, self.timestamp)
+                    self.timestamp = self.timestamp + 1 # should be monotonically increasing, because in LIVE_STREAM mode
                     
                 self.put_gestures(frame)
             if self.menu:
@@ -93,7 +86,7 @@ class GestureRecognizer:
             cv2.imshow('MediaPipe Hands', frame)
             
 
-        cap.release()
+        self.cap.release()
 
 
     def display_menu(self, frame):
@@ -108,6 +101,8 @@ class GestureRecognizer:
         if self.selected_option:
             cv2.putText(frame, f"Selected: {self.selected_option}", (10, y_pos + 20),
                         cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
+            if self.selected_option == "Jogar":
+                self.Jogar()
     
     
     def put_gestures(self, frame):
@@ -124,19 +119,18 @@ class GestureRecognizer:
     def __result_callback(self, result, output_image, timestamp_ms):
         #print(f'gesture recognition result: {result}')
         self.lock.acquire() # solves potential concurrency issues
-        self.current_gestures = []
         if result and result.gestures:
             # Get the most confident gesture
             gesture_name = result.gestures[0][0].category_name
 
-            if gesture_name in self.options:
+            if gesture_name in self.menuOptions:
                 current_time = time.time()
 
                 # Check if the gesture is consistent
                 if self.start_time and self.current_gestures and self.current_gestures[0] == gesture_name:
                     duration = current_time - self.start_time
                     if duration >= self.required_duration:
-                        self.selected_option = self.options[gesture_name]
+                        self.selected_option = self.menuOptions[gesture_name]
                         print(f"Selected: {self.selected_option}")
                         self.start_time = None  # Reset the timer
                         self.current_gestures = []
@@ -147,15 +141,103 @@ class GestureRecognizer:
             else:
                 self.start_time = None  # Reset if unrecognized gesture
                 self.current_gestures = []
-        """
-        if result is not None and any(result.gestures):
-            print("Recognized gestures:")
-            for single_hand_gesture_data in result.gestures:
-                gesture_name = single_hand_gesture_data[0].category_name
-                print(gesture_name)
-                self.current_gestures.append(gesture_name)
-        """
         self.lock.release()
+        
+    def Jogar(self):
+        # Importing all images
+        imgBackground = cv2.imread("FinalProject_GesturesPong/images/backgroundPong.png")
+        imgGameOver = cv2.imread("FinalProject_GesturesPong/images/GameOver.png")
+        imgBall = cv2.imread("FinalProject_GesturesPong/images/bolaresize.png", cv2.IMREAD_UNCHANGED)
+        imgBlock1 = cv2.imread("FinalProject_GesturesPong/images/Bloco1.png", cv2.IMREAD_UNCHANGED)
+        imgBlock2 = cv2.imread("FinalProject_GesturesPong/images/Bloco2.png", cv2.IMREAD_UNCHANGED)
+
+        detector = HandDetector(detectionCon=0.8, maxHands=2)
+
+        ballPos = [100, 100]
+        speedX = 15
+        speedY = 15
+        gameOver = False
+        score = [0, 0]
+        while True:
+            _, img = self.cap.read()
+            img = cv2.flip(img, 1)
+            imgRaw = img.copy()
+
+            # Find the hand and its landmarks
+            hands, img = detector.findHands(img, flipType=False)  # with draw
+            detector.mpHands
+            # Overlaying the background image
+            img = cv2.addWeighted(img, 0.2, imgBackground, 0.8, 0)
+
+            # Check for hands
+            if hands:
+                for hand in hands:
+                    x, y, w, h = hand['bbox']
+                    h1, w1, _ = imgBlock1.shape
+                    y1 = y - h1 // 2
+                    y1 = np.clip(y1, 20, 415)
+
+                    if hand['type'] == "Left":
+                        img = cvzone.overlayPNG(img, imgBlock1, (59, y1))
+                        if 59 < ballPos[0] < 59 + w1 and y1 < ballPos[1] < y1 + h1:
+                            speedX = -speedX
+                            ballPos[0] += 30
+                            score[0] += 1
+
+                    if hand['type'] == "Right":
+                        img = cvzone.overlayPNG(img, imgBlock2, (1195, y1))
+                        if 1195 - 50 < ballPos[0] < 1195 and y1 < ballPos[1] < y1 + h1:
+                            speedX = -speedX
+                            ballPos[0] -= 30
+                            score[1] += 1
+                            speedX += 0.2
+                            speedY += 0.2
+
+            # Game not Over move ball
+            if ballPos[0] < 40 or ballPos[0] > 1200:
+                gameOver = True
+
+            if not gameOver:
+                # Change ball position frame by frame 
+                if ballPos[1] >= 500 or ballPos[1] <= 10:
+                    speedY = -speedY
+
+                ballPos[0] += speedX
+                ballPos[1] += speedY
+
+                # Draw the ball
+                img = cvzone.overlayPNG(img, imgBall, ballPos)
+
+                cv2.putText(img, str(score[0]), (300, 650), cv2.FONT_HERSHEY_COMPLEX, 3, (255, 255, 255), 5)
+                cv2.putText(img, str(score[1]), (900, 650), cv2.FONT_HERSHEY_COMPLEX, 3, (255, 255, 255), 5)
+
+            # game over 
+            else:
+                img = imgGameOver
+                cv2.putText(img, str(score[1] + score[0]).zfill(2), (585, 360), cv2.FONT_HERSHEY_COMPLEX,
+                            2.5, (200, 0, 200), 5)
+                self.lock.acquire()
+                if self.current_gestures:
+                    gesture_name = self.current_gestures[0]
+                    if gesture_name == "Thumb_Up":
+                        # Restart game
+                        ballPos = [100, 100]
+                        speedX = 15
+                        speedY = 15
+                        gameOver = False
+                        score = [0, 0]
+                        imgGameOver = cv2.imread("FinalProject_GesturesPong/images/GameOver.png")
+                        print("Game Restarted")
+                    elif gesture_name == "Thumb_Down":
+                        print("Exiting Game")
+                        self.lock.release()
+                        break
+                self.lock.release()
+
+            img[580:700, 20:233] = cv2.resize(imgRaw, (213, 120))
+
+            cv2.imshow("Image", img)
+
 
 if __name__ == "__main__":
     images = {}
