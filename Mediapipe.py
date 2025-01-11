@@ -18,6 +18,7 @@ class GestureRecognizer:
         self.start_time = None
         self.required_duration = 1.5  # manter gesto por 2 segundos
         self.menu = True #Display menu boolean
+        self.inGame = False
         self.menuOptions = {
             "Thumb_Up": "Jogar",
             "Victory": "Pontuacao",
@@ -63,8 +64,12 @@ class GestureRecognizer:
         self.cap.set(4, 720)
         
     def main(self):
+        cap = cv2.VideoCapture(0)
+        cap.set(3, 1280)
+        cap.set(4, 720)
+        
         while cv2.pollKey() == -1: # cv2.waitKey(1) & 0xFF == 27
-            ret, frame = self.cap.read()
+            ret, frame = cap.read()
             if not ret:
                 break
             
@@ -85,8 +90,8 @@ class GestureRecognizer:
                 self.display_menu(frame)
             cv2.imshow('MediaPipe Hands', frame)
             
-
-        self.cap.release()
+        cap.release()
+        cv2.destroyAllWindows()
 
 
     def display_menu(self, frame):
@@ -101,8 +106,17 @@ class GestureRecognizer:
         if self.selected_option:
             cv2.putText(frame, f"Selected: {self.selected_option}", (10, y_pos + 20),
                         cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
+            self.current_gestures = []
+            self.menu = False
+            
             if self.selected_option == "Jogar":
+                self.inGame = True
                 self.Jogar()
+                self.inGame = False
+            elif self.selected_option == "Creditos":
+                self.Creditos()
+            elif self.selected_option == "Pontuacao":
+                self.Pontuacao()
     
     
     def put_gestures(self, frame):
@@ -129,7 +143,7 @@ class GestureRecognizer:
                 # Check if the gesture is consistent
                 if self.start_time and self.current_gestures and self.current_gestures[0] == gesture_name:
                     duration = current_time - self.start_time
-                    if duration >= self.required_duration:
+                    if duration >= self.required_duration and not self.inGame:
                         self.selected_option = self.menuOptions[gesture_name]
                         print(f"Selected: {self.selected_option}")
                         self.start_time = None  # Reset the timer
@@ -158,16 +172,22 @@ class GestureRecognizer:
         speedY = 15
         gameOver = False
         score = [0, 0]
-        while True:
-            _, img = self.cap.read()
-            img = cv2.flip(img, 1)
-            imgRaw = img.copy()
+        
+        cap2 = cv2.VideoCapture(0)
+        cap2.set(3, 1280)
+        cap2.set(4, 720)
+        
+        while cv2.pollKey() == -1:
+            ret, frame = cap2.read()
+            if not ret:
+                break
+            rawFrame = frame.copy()
 
             # Find the hand and its landmarks
-            hands, img = detector.findHands(img, flipType=False)  # with draw
+            hands, cap2 = detector.findHands(frame, flipType=False)  # with draw
             detector.mpHands
             # Overlaying the background image
-            img = cv2.addWeighted(img, 0.2, imgBackground, 0.8, 0)
+            frame = cv2.addWeighted(frame, 0.2, imgBackground, 0.8, 0)
 
             # Check for hands
             if hands:
@@ -178,14 +198,14 @@ class GestureRecognizer:
                     y1 = np.clip(y1, 20, 415)
 
                     if hand['type'] == "Left":
-                        img = cvzone.overlayPNG(img, imgBlock1, (59, y1))
+                        frame = cvzone.overlayPNG(frame, imgBlock1, (59, y1))
                         if 59 < ballPos[0] < 59 + w1 and y1 < ballPos[1] < y1 + h1:
                             speedX = -speedX
                             ballPos[0] += 30
                             score[0] += 1
 
                     if hand['type'] == "Right":
-                        img = cvzone.overlayPNG(img, imgBlock2, (1195, y1))
+                        frame = cvzone.overlayPNG(frame, imgBlock2, (1195, y1))
                         if 1195 - 50 < ballPos[0] < 1195 and y1 < ballPos[1] < y1 + h1:
                             speedX = -speedX
                             ballPos[0] -= 30
@@ -193,8 +213,8 @@ class GestureRecognizer:
                             speedX += 0.2
                             speedY += 0.2
 
-            # Game not Over move ball
-            if ballPos[0] < 40 or ballPos[0] > 1200:
+            
+            if ballPos[0] < 40 or ballPos[0] > 1260:
                 gameOver = True
 
             if not gameOver:
@@ -206,15 +226,15 @@ class GestureRecognizer:
                 ballPos[1] += speedY
 
                 # Draw the ball
-                img = cvzone.overlayPNG(img, imgBall, ballPos)
+                frame = cvzone.overlayPNG(frame, imgBall, ballPos)
 
-                cv2.putText(img, str(score[0]), (300, 650), cv2.FONT_HERSHEY_COMPLEX, 3, (255, 255, 255), 5)
-                cv2.putText(img, str(score[1]), (900, 650), cv2.FONT_HERSHEY_COMPLEX, 3, (255, 255, 255), 5)
+                cv2.putText(frame, str(score[0]), (300, 650), cv2.FONT_HERSHEY_COMPLEX, 3, (255, 255, 255), 5)
+                cv2.putText(frame, str(score[1]), (900, 650), cv2.FONT_HERSHEY_COMPLEX, 3, (255, 255, 255), 5)
 
             # game over 
             else:
-                img = imgGameOver
-                cv2.putText(img, str(score[1] + score[0]).zfill(2), (585, 360), cv2.FONT_HERSHEY_COMPLEX,
+                frame = imgGameOver
+                cv2.putText(frame, str(score[1] + score[0]).zfill(2), (585, 360), cv2.FONT_HERSHEY_COMPLEX,
                             2.5, (200, 0, 200), 5)
                 self.lock.acquire()
                 if self.current_gestures:
@@ -234,9 +254,9 @@ class GestureRecognizer:
                         break
                 self.lock.release()
 
-            img[580:700, 20:233] = cv2.resize(imgRaw, (213, 120))
+            frame[580:700, 20:233] = cv2.resize(rawFrame, (213, 120))
 
-            cv2.imshow("Image", img)
+            cv2.imshow("Image", frame)
 
 
 if __name__ == "__main__":
