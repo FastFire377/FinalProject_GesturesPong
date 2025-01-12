@@ -25,15 +25,15 @@ gameOver = False
 score = [0, 0]
 
 while True:
-    _, img = cap.read()
-    img = cv2.flip(img, 1)
-    imgRaw = img.copy()
+    _, frame = cap.read()
+    frame = cv2.flip(frame, 1)
+    imgRaw = frame.copy()
 
     # Find the hand and its landmarks
-    hands, img = detector.findHands(img, flipType=False)  # with draw
+    hands, frame = detector.findHands(frame, flipType=False)  # with draw
 
     # Overlaying the background image
-    img = cv2.addWeighted(img, 0.2, imgBackground, 0.8, 0)
+    frame = cv2.addWeighted(frame, 0.2, imgBackground, 0.8, 0)
 
     # Check for hands
     if hands:
@@ -44,14 +44,14 @@ while True:
             y1 = np.clip(y1, 20, 415)
 
             if hand['type'] == "Left":
-                img = cvzone.overlayPNG(img, imgBlock1, (59, y1))
+                frame = cvzone.overlayPNG(frame, imgBlock1, (59, y1))
                 if 59 < ballPos[0] < 59 + w1 and y1 < ballPos[1] < y1 + h1:
                     speedX = -speedX
                     ballPos[0] += 30
                     score[0] += 1
 
             if hand['type'] == "Right":
-                img = cvzone.overlayPNG(img, imgBlock2, (1195, y1))
+                frame = cvzone.overlayPNG(frame, imgBlock2, (1195, y1))
                 if 1195 - 50 < ballPos[0] < 1195 and y1 < ballPos[1] < y1 + h1:
                     speedX = -speedX
                     ballPos[0] -= 30
@@ -62,8 +62,8 @@ while True:
         gameOver = True
 
     if gameOver:
-        img = imgGameOver
-        cv2.putText(img, str(score[1] + score[0]).zfill(2), (585, 360), cv2.FONT_HERSHEY_COMPLEX,
+        frame = imgGameOver
+        cv2.putText(frame, str(score[1] + score[0]).zfill(2), (585, 360), cv2.FONT_HERSHEY_COMPLEX,
                     2.5, (200, 0, 200), 5)
 
     # If game not over move the ball
@@ -77,14 +77,14 @@ while True:
         ballPos[1] += speedY
 
         # Draw the ball
-        img = cvzone.overlayPNG(img, imgBall, ballPos)
+        frame = cvzone.overlayPNG(frame, imgBall, ballPos)
 
-        cv2.putText(img, str(score[0]), (300, 650), cv2.FONT_HERSHEY_COMPLEX, 3, (255, 255, 255), 5)
-        cv2.putText(img, str(score[1]), (900, 650), cv2.FONT_HERSHEY_COMPLEX, 3, (255, 255, 255), 5)
+        cv2.putText(frame, str(score[0]), (300, 650), cv2.FONT_HERSHEY_COMPLEX, 3, (255, 255, 255), 5)
+        cv2.putText(frame, str(score[1]), (900, 650), cv2.FONT_HERSHEY_COMPLEX, 3, (255, 255, 255), 5)
 
-    img[580:700, 20:233] = cv2.resize(imgRaw, (213, 120))
+    frame[580:700, 20:233] = cv2.resize(imgRaw, (213, 120))
 
-    cv2.imshow("Image", img)
+    cv2.imshow("Image", frame)
     key = cv2.waitKey(1)
     if key == ord('r'):
         ballPos = [100, 100]

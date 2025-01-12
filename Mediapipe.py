@@ -64,12 +64,9 @@ class GestureRecognizer:
         self.cap.set(4, 720)
         
     def main(self):
-        cap = cv2.VideoCapture(0)
-        cap.set(3, 1280)
-        cap.set(4, 720)
         
         while cv2.pollKey() == -1: # cv2.waitKey(1) & 0xFF == 27
-            ret, frame = cap.read()
+            ret, frame = self.cap.read()
             if not ret:
                 break
             
@@ -90,7 +87,7 @@ class GestureRecognizer:
                 self.display_menu(frame)
             cv2.imshow('MediaPipe Hands', frame)
             
-        cap.release()
+        self.cap.release()
         cv2.destroyAllWindows()
 
 
@@ -131,15 +128,14 @@ class GestureRecognizer:
             y_pos += 50
 
     def __result_callback(self, result, output_image, timestamp_ms):
-        #print(f'gesture recognition result: {result}')
-        self.lock.acquire() # solves potential concurrency issues
+        self.lock.acquire()  
+        
         if result and result.gestures:
-            # Get the most confident gesture
             gesture_name = result.gestures[0][0].category_name
 
             if gesture_name in self.menuOptions:
                 current_time = time.time()
-
+                
                 # Check if the gesture is consistent
                 if self.start_time and self.current_gestures and self.current_gestures[0] == gesture_name:
                     duration = current_time - self.start_time
@@ -149,13 +145,14 @@ class GestureRecognizer:
                         self.start_time = None  # Reset the timer
                         self.current_gestures = []
                 else:
-                    # Start the timer for a new gesture
-                    self.start_time = current_time
+                    self.start_time = current_time 
                     self.current_gestures = [gesture_name]
             else:
-                self.start_time = None  # Reset if unrecognized gesture
+                # Start the timer for a new gesture
+                self.start_time = current_time
                 self.current_gestures = []
         self.lock.release()
+
         
     def Jogar(self):
         # Importing all images
@@ -173,18 +170,15 @@ class GestureRecognizer:
         gameOver = False
         score = [0, 0]
         
-        cap2 = cv2.VideoCapture(0)
-        cap2.set(3, 1280)
-        cap2.set(4, 720)
-        
         while cv2.pollKey() == -1:
-            ret, frame = cap2.read()
+            ret, frame = self.cap.read()
+            frame = cv2.flip(frame, 1)
             if not ret:
                 break
             rawFrame = frame.copy()
 
             # Find the hand and its landmarks
-            hands, cap2 = detector.findHands(frame, flipType=False)  # with draw
+            hands, frame = detector.findHands(frame, flipType=False)  # with draw
             detector.mpHands
             # Overlaying the background image
             frame = cv2.addWeighted(frame, 0.2, imgBackground, 0.8, 0)
@@ -210,8 +204,8 @@ class GestureRecognizer:
                             speedX = -speedX
                             ballPos[0] -= 30
                             score[1] += 1
-                            speedX += 0.2
-                            speedY += 0.2
+                            #speedX += 0.2
+                            #speedY += 0.2
 
             
             if ballPos[0] < 40 or ballPos[0] > 1260:
