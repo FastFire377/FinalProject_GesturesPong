@@ -84,7 +84,7 @@ while True:
 
     frame[580:700, 20:233] = cv2.resize(imgRaw, (213, 120))
 
-    cv2.imshow("Image", frame)
+    cv2.imshow("Pong Project", frame)
     key = cv2.waitKey(1)
     if key == ord('r'):
         ballPos = [100, 100]

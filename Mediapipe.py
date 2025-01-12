@@ -85,7 +85,7 @@ class GestureRecognizer:
                 self.put_gestures(frame)
             if self.menu:
                 self.display_menu(frame)
-            cv2.imshow('MediaPipe Hands', frame)
+            cv2.imshow('Pong Project', frame)
             
         self.cap.release()
         cv2.destroyAllWindows()
@@ -129,13 +129,13 @@ class GestureRecognizer:
 
     def __result_callback(self, result, output_image, timestamp_ms):
         self.lock.acquire()  
-        
+
         if result and result.gestures:
             gesture_name = result.gestures[0][0].category_name
-
+            current_time = time.time()
             if gesture_name in self.menuOptions:
-                current_time = time.time()
                 
+                # print("current_time:", current_time)
                 # Check if the gesture is consistent
                 if self.start_time and self.current_gestures and self.current_gestures[0] == gesture_name:
                     duration = current_time - self.start_time
@@ -149,7 +149,7 @@ class GestureRecognizer:
                     self.current_gestures = [gesture_name]
             else:
                 # Start the timer for a new gesture
-                self.start_time = current_time
+                self.start_time = None
                 self.current_gestures = []
         self.lock.release()
 
@@ -230,27 +230,63 @@ class GestureRecognizer:
                 frame = imgGameOver
                 cv2.putText(frame, str(score[1] + score[0]).zfill(2), (585, 360), cv2.FONT_HERSHEY_COMPLEX,
                             2.5, (200, 0, 200), 5)
-                self.lock.acquire()
-                if self.current_gestures:
+                self.update_highest_score(score[1] + score[0])
+                
+                """self.lock.acquire()
+                if self.current_gestures: 
                     gesture_name = self.current_gestures[0]
                     if gesture_name == "Thumb_Up":
-                        # Restart game
-                        ballPos = [100, 100]
-                        speedX = 15
-                        speedY = 15
+                        print("Restarting game...")
                         gameOver = False
+                        ballPos = [100, 100]
+                        speedX, speedY = 15, 15
                         score = [0, 0]
-                        imgGameOver = cv2.imread("FinalProject_GesturesPong/images/GameOver.png")
-                        print("Game Restarted")
                     elif gesture_name == "Thumb_Down":
                         print("Exiting Game")
                         self.lock.release()
-                        break
-                self.lock.release()
+                        break"""
+                if hands:
+                    for hand in hands:
+                        fingers = detector.fingersUp(hand)
+                        
+                        if fingers == [1, 0, 0, 0, 0]:  # Gesto "thumb up"
+                            print("Restarting game...")
+                            gameOver = False
+                            ballPos = [100, 100]
+                            speedX, speedY = 15, 15
+                            score = [0, 0]
+                            #imgGameOver = cv2.imread("FinalProject_GesturesPong/images/GameOver.png")      
+                
 
             frame[580:700, 20:233] = cv2.resize(rawFrame, (213, 120))
 
-            cv2.imshow("Image", frame)
+            cv2.imshow('Pong Project', frame)
+        self.menu = True
+        self.inGame = False
+        
+
+    def update_highest_score(self, score):
+        # Nome do ficheiro para guardar o maior score
+        scorefilepath = "FinalProject_GesturesPong/highestScore.txt"
+
+        # Verificar o maior score atual no ficheiro
+        if os.path.exists(scorefilepath):
+            with open(scorefilepath, 'r') as file:
+                try:
+                    highest_score = int(file.read().strip())
+                except ValueError:
+                    highest_score = 0  # If no value
+        else:
+            highest_score = 0
+
+        # Atualizar o ficheiro se o score atual for maior
+        if score > highest_score:
+            with open(scorefilepath, 'w') as file:
+                file.write(str(score))
+            print("Highest score updated:", score)
+            return True
+        else:
+            return False
 
 
 if __name__ == "__main__":
@@ -258,7 +294,7 @@ if __name__ == "__main__":
     images_path = "FinalProject_GesturesPong/images/"
     for images_file in glob.glob(os.path.join(images_path, "*.png")):
         images_name = os.path.splitext(os.path.basename(images_file))[0]
-        print("image name:", images_name)
+        # print("image name:", images_name)
         images[images_name] = cv2.imread(images_file, cv2.IMREAD_UNCHANGED)
     
     rec = GestureRecognizer(images=images)
