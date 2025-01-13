@@ -79,8 +79,7 @@ class GestureRecognizer:
                 for hand_landmarks in results.multi_hand_landmarks:
                     self.mp_drawing.draw_landmarks(frame, hand_landmarks, self.mp_hands.HAND_CONNECTIONS)
                     mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=np_array)
-                    self.recognizer.recognize_async(mp_image, self.timestamp)
-                    self.timestamp = self.timestamp + 1 # should be monotonically increasing, because in LIVE_STREAM mode
+                    self.recognizer.recognize_async(mp_image)
                     
                 self.put_gestures(frame)
             if self.menu:
@@ -89,6 +88,18 @@ class GestureRecognizer:
             
         self.cap.release()
         cv2.destroyAllWindows()
+
+
+    def put_gestures(self, frame):
+        self.lock.acquire()
+        gestures = self.current_gestures
+        self.lock.release()
+        y_pos = 50
+        for hand_gesture_name in gestures:
+            # show the prediction on the frame
+            cv2.putText(frame, hand_gesture_name, (10, y_pos), cv2.FONT_HERSHEY_SIMPLEX, 
+                                1, (0,0,255), 2, cv2.LINE_AA)
+            y_pos += 50
 
 
     def display_menu(self, frame):
@@ -113,21 +124,18 @@ class GestureRecognizer:
             elif self.selected_option == "Creditos":
                 self.Creditos()
             elif self.selected_option == "Pontuacao":
-                self.Pontuacao()
-    
-    
-    def put_gestures(self, frame):
-        self.lock.acquire()
-        gestures = self.current_gestures
-        self.lock.release()
-        y_pos = 50
-        for hand_gesture_name in gestures:
-            # show the prediction on the frame
-            cv2.putText(frame, hand_gesture_name, (10, y_pos), cv2.FONT_HERSHEY_SIMPLEX, 
-                                1, (0,0,255), 2, cv2.LINE_AA)
-            y_pos += 50
+                self.Pontuacao() 
 
-    def __result_callback(self, result, output_image, timestamp_ms):
+
+    def Creditos(self):
+        pass
+    
+    
+    def Pontuacao(self):
+        pass
+
+
+    def __result_callback(self, result):
         self.lock.acquire()  
 
         if result and result.gestures:
@@ -232,7 +240,7 @@ class GestureRecognizer:
                             2.5, (200, 0, 200), 5)
                 self.update_highest_score(score[1] + score[0])
                 
-                """self.lock.acquire()
+                self.lock.acquire()
                 if self.current_gestures: 
                     gesture_name = self.current_gestures[0]
                     if gesture_name == "Thumb_Up":
@@ -243,8 +251,9 @@ class GestureRecognizer:
                         score = [0, 0]
                     elif gesture_name == "Thumb_Down":
                         print("Exiting Game")
-                        self.lock.release()
-                        break"""
+                        break
+                    
+                self.lock.release()
                 if hands:
                     for hand in hands:
                         fingers = detector.fingersUp(hand)
