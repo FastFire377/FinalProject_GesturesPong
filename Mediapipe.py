@@ -178,8 +178,7 @@ class GestureRecognizer:
         imgBall = cv2.imread("FinalProject_GesturesPong/images/bolaresize.png", cv2.IMREAD_UNCHANGED)
         imgBlock1 = cv2.imread("FinalProject_GesturesPong/images/Bloco1.png", cv2.IMREAD_UNCHANGED)
         imgBlock2 = cv2.imread("FinalProject_GesturesPong/images/Bloco2.png", cv2.IMREAD_UNCHANGED)
-
-        detector = HandDetector(detectionCon=0.8, maxHands=2)
+        
         self.current_gestures = []
 
         ballPos = [100, 100]
@@ -193,13 +192,8 @@ class GestureRecognizer:
             frame = cv2.flip(frame, 1)
             if not ret:
                 break
-
-            # Find the hand and its landmarks
-            hands, frame = detector.findHands(frame, flipType=False)  # with draw
-            detector.mpHands
             
-            
-            results = self.hands.process(frame)
+            results = self.hands.process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
             frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
             np_array = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             
@@ -209,7 +203,7 @@ class GestureRecognizer:
                     mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=np_array)
                     self.recognizer.recognize_async(mp_image, self.timestamp)
                     self.timestamp = self.timestamp + 1
-            self.put_gestures(frame)
+                self.put_gestures(frame)
             
             #Guardar frame antes de adicionar background
             rawFrame = frame.copy()
@@ -218,31 +212,28 @@ class GestureRecognizer:
             frame = cv2.addWeighted(rawFrame, 0.2, imgBackground, 0.8, 0)
 
             # Check for hands
-            if hands:
-                for hand in hands:
-                    x, y, w, h = hand['bbox']
-                    h1, w1, _ = imgBlock1.shape
-                    y1 = y - h1 // 2
-                    y1 = np.clip(y1, 20, 415)
+            if results.multi_hand_landmarks:
+                for hand_landmarks in results.multi_hand_landmarks:
+                    x_min = min([lm.x for lm in hand_landmarks.landmark]) * frame.shape[1]
+                    y_min = min([lm.y for lm in hand_landmarks.landmark]) * frame.shape[0]
+                    y_min = np.clip(int(y_min - 50), 20, 415)
 
-                    if hand['type'] == "Left":
-                        frame = cvzone.overlayPNG(frame, imgBlock1, (59, y1))
-                        if 59 < ballPos[0] < 59 + w1 and y1 < ballPos[1] < y1 + h1:
+                    if x_min < frame.shape[1] // 2:  # Left hand
+                        frame = cvzone.overlayPNG(frame, imgBlock1, (59, y_min))
+                        if 59 < ballPos[0] < 59 + imgBlock1.shape[1] and y_min < ballPos[1] < y_min + imgBlock1.shape[0]:
                             speedX = -speedX
                             ballPos[0] += 30
                             score[0] += 1
                             speedX += 0.2
                             #speedY += 0.2
 
-                    if hand['type'] == "Right":
-                        frame = cvzone.overlayPNG(frame, imgBlock2, (1195, y1))
-                        if 1195 - 50 < ballPos[0] < 1195 and y1 < ballPos[1] < y1 + h1:
+                    else:  # Right hand
+                        frame = cvzone.overlayPNG(frame, imgBlock2, (1195, y_min))
+                        if 1195 - 50 < ballPos[0] < 1195 and y_min < ballPos[1] < y_min + imgBlock2.shape[0]:
                             speedX = -speedX
                             ballPos[0] -= 30
                             score[1] += 1
                             
-
-            
             if ballPos[0] < 40 or ballPos[0] > 1260:
                 gameOver = True
                 self.current_gestures = []
@@ -258,6 +249,8 @@ class GestureRecognizer:
 
                 ballPos[0] += speedX
                 ballPos[1] += speedY
+                
+                ballPos = [int(ballPos[0]), int(ballPos[1])]
 
                 # Draw the ball
                 frame = cvzone.overlayPNG(frame, imgBall, ballPos)
@@ -267,7 +260,6 @@ class GestureRecognizer:
 
             # game over 
             else:
-                self.lock.acquire()
                 frame = cv2.addWeighted(rawFrame, 0.7, imgGameOver, 0.3, 0)
                 cv2.putText(frame, str(score[1] + score[0]).zfill(2), (585, 360), cv2.FONT_HERSHEY_SIMPLEX,
                             2.5, (200, 0, 200), 5)
@@ -281,8 +273,6 @@ class GestureRecognizer:
                     elif gesture_name == "Thumb_Down":
                         print("Exiting Game")
                         break
-                    
-                self.lock.release()
 
             frame[580:700, 20:233] = cv2.resize(rawFrame, (213, 120))
 
