@@ -16,7 +16,7 @@ class GestureRecognizer:
         self.current_gestures = []
         self.selected_option = None
         self.start_time = None
-        self.required_duration = 1.5  # manter gesto por 2 segundos
+        self.required_duration = 1  # manter gesto por 1 segundo
         self.menu = True #Display menu boolean
         self.inGame = False
         self.menuOptions = {
@@ -67,6 +67,7 @@ class GestureRecognizer:
         
         while cv2.pollKey() == -1: # cv2.waitKey(1) & 0xFF == 27
             ret, frame = self.cap.read()
+            frame = cv2.flip(frame, 1)
             if not ret:
                 break
             
@@ -108,7 +109,7 @@ class GestureRecognizer:
         y_pos = 50
         
         frame = cvzone.overlayPNG(frame, self.images["JogarButton"], [310, -50])
-        frame = cvzone.overlayPNG(frame, self.images["PontuacaoButton"], [280, 160])
+        frame = cvzone.overlayPNG(frame, self.images["PontuacaoButton"], [280, 173])
         frame = cvzone.overlayPNG(frame, self.images["CreditosButton"], [280, 420])
         
         # Display the selected option
@@ -124,8 +125,14 @@ class GestureRecognizer:
                 self.inGame = False
             elif self.selected_option == "Creditos":
                 self.Creditos()
+                
             elif self.selected_option == "Pontuacao":
-                self.Pontuacao() 
+                self.Pontuacao()
+                
+            
+            # Reinicializar variáveis
+            self.menu = True
+            self.selected_option = None
 
 
     def Creditos(self):
@@ -141,6 +148,7 @@ class GestureRecognizer:
 
         if result and result.gestures:
             gesture_name = result.gestures[0][0].category_name
+            print("gesture name:", gesture_name)
             current_time = time.time()
             if gesture_name in self.menuOptions:
                 
@@ -172,6 +180,7 @@ class GestureRecognizer:
         imgBlock2 = cv2.imread("FinalProject_GesturesPong/images/Bloco2.png", cv2.IMREAD_UNCHANGED)
 
         detector = HandDetector(detectionCon=0.8, maxHands=2)
+        self.current_gestures = []
 
         ballPos = [100, 100]
         speedX = 15
@@ -184,13 +193,29 @@ class GestureRecognizer:
             frame = cv2.flip(frame, 1)
             if not ret:
                 break
-            rawFrame = frame.copy()
 
             # Find the hand and its landmarks
             hands, frame = detector.findHands(frame, flipType=False)  # with draw
             detector.mpHands
+            
+            
+            results = self.hands.process(frame)
+            frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+            np_array = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            
+            if results.multi_hand_landmarks:
+                for hand_landmarks in results.multi_hand_landmarks:
+                    self.mp_drawing.draw_landmarks(frame, hand_landmarks, self.mp_hands.HAND_CONNECTIONS)
+                    mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=np_array)
+                    self.recognizer.recognize_async(mp_image, self.timestamp)
+                    self.timestamp = self.timestamp + 1
+            self.put_gestures(frame)
+            
+            #Guardar frame antes de adicionar background
+            rawFrame = frame.copy()
+            
             # Overlaying the background image
-            frame = cv2.addWeighted(frame, 0.2, imgBackground, 0.8, 0)
+            frame = cv2.addWeighted(rawFrame, 0.2, imgBackground, 0.8, 0)
 
             # Check for hands
             if hands:
@@ -206,6 +231,8 @@ class GestureRecognizer:
                             speedX = -speedX
                             ballPos[0] += 30
                             score[0] += 1
+                            speedX += 0.2
+                            #speedY += 0.2
 
                     if hand['type'] == "Right":
                         frame = cvzone.overlayPNG(frame, imgBlock2, (1195, y1))
@@ -213,12 +240,16 @@ class GestureRecognizer:
                             speedX = -speedX
                             ballPos[0] -= 30
                             score[1] += 1
-                            #speedX += 0.2
-                            #speedY += 0.2
+                            
 
             
             if ballPos[0] < 40 or ballPos[0] > 1260:
                 gameOver = True
+                self.current_gestures = []
+                self.update_highest_score(score[1] + score[0])
+                ballPos = [100, 100]
+                speedX, speedY = 15, 15
+                score = [0, 0]
 
             if not gameOver:
                 # Change ball position frame by frame 
@@ -231,48 +262,32 @@ class GestureRecognizer:
                 # Draw the ball
                 frame = cvzone.overlayPNG(frame, imgBall, ballPos)
 
-                cv2.putText(frame, str(score[0]), (300, 650), cv2.FONT_HERSHEY_COMPLEX, 3, (255, 255, 255), 5)
-                cv2.putText(frame, str(score[1]), (900, 650), cv2.FONT_HERSHEY_COMPLEX, 3, (255, 255, 255), 5)
+                cv2.putText(frame, str(score[0]), (300, 650), cv2.FONT_HERSHEY_SIMPLEX, 3, (255, 255, 255), 5)
+                cv2.putText(frame, str(score[1]), (900, 650), cv2.FONT_HERSHEY_SIMPLEX, 3, (255, 255, 255), 5)
 
             # game over 
             else:
-                frame = imgGameOver
-                cv2.putText(frame, str(score[1] + score[0]).zfill(2), (585, 360), cv2.FONT_HERSHEY_COMPLEX,
-                            2.5, (200, 0, 200), 5)
-                self.update_highest_score(score[1] + score[0])
-                
                 self.lock.acquire()
+                frame = cv2.addWeighted(rawFrame, 0.7, imgGameOver, 0.3, 0)
+                cv2.putText(frame, str(score[1] + score[0]).zfill(2), (585, 360), cv2.FONT_HERSHEY_SIMPLEX,
+                            2.5, (200, 0, 200), 5)
+                
                 if self.current_gestures: 
                     gesture_name = self.current_gestures[0]
                     if gesture_name == "Thumb_Up":
-                        print("Restarting game...")
+                        self.current_gestures = []
+                        print("Restarting game... with callback")
                         gameOver = False
-                        ballPos = [100, 100]
-                        speedX, speedY = 15, 15
-                        score = [0, 0]
                     elif gesture_name == "Thumb_Down":
                         print("Exiting Game")
                         break
                     
                 self.lock.release()
-                if hands:
-                    for hand in hands:
-                        fingers = detector.fingersUp(hand)
-                        
-                        if fingers == [1, 0, 0, 0, 0]:  # Gesto "thumb up"
-                            print("Restarting game...")
-                            gameOver = False
-                            ballPos = [100, 100]
-                            speedX, speedY = 15, 15
-                            score = [0, 0]
-                            #imgGameOver = cv2.imread("FinalProject_GesturesPong/images/GameOver.png")      
-                
 
             frame[580:700, 20:233] = cv2.resize(rawFrame, (213, 120))
 
             cv2.imshow('Pong Project', frame)
-        self.menu = True
-        self.inGame = False
+        
         
 
     def update_highest_score(self, score):
