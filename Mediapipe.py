@@ -79,7 +79,8 @@ class GestureRecognizer:
                 for hand_landmarks in results.multi_hand_landmarks:
                     self.mp_drawing.draw_landmarks(frame, hand_landmarks, self.mp_hands.HAND_CONNECTIONS)
                     mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=np_array)
-                    self.recognizer.recognize_async(mp_image)
+                    self.recognizer.recognize_async(mp_image, self.timestamp)
+                    self.timestamp = self.timestamp + 1
                     
                 self.put_gestures(frame)
             if self.menu:
@@ -135,7 +136,7 @@ class GestureRecognizer:
         pass
 
 
-    def __result_callback(self, result):
+    def __result_callback(self, result, output_image, timestamp_ms):
         self.lock.acquire()  
 
         if result and result.gestures:
