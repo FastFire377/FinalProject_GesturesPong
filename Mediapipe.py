@@ -136,11 +136,84 @@ class GestureRecognizer:
 
 
     def Creditos(self):
-        pass
-    
-    
+        imgBackground = cv2.imread("FinalProject_GesturesPong/images/backgroundPong.png")
+        prev_x_positions = []
+
+        while True:
+            ret, frame = self.cap.read()
+            if not ret:
+                break
+            frame = cv2.flip(frame, 1)
+            rawFrame = frame
+            frame = cv2.addWeighted(frame, 0.2, imgBackground, 0.8, 0)
+            frame = cvzone.overlayPNG(frame, self.images["creditosText"], [140, -150])
+            cv2.putText(frame, "Developed by: Ricardo Vilhena", (400, 300), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
+            cv2.putText(frame, "Swipe Left to return to the menu", (360, 500), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
+            
+            # Process hands using mediapipe
+            results = self.hands.process(cv2.cvtColor(rawFrame, cv2.COLOR_BGR2RGB))
+            if results.multi_hand_landmarks:
+                for hand_landmarks in results.multi_hand_landmarks:
+                    self.mp_drawing.draw_landmarks(frame, hand_landmarks, self.mp_hands.HAND_CONNECTIONS)
+
+                    x_positions = [lm.x for lm in hand_landmarks.landmark]
+                    if prev_x_positions:
+                        movement = [curr - prev for curr, prev in zip(x_positions, prev_x_positions)]
+                        if all(m < -0.02 for m in movement):  # Consistent leftward movement
+                            return
+                    prev_x_positions = x_positions
+
+            cv2.imshow('Pong Project', frame)
+            if cv2.pollKey() != -1:
+                break
+
     def Pontuacao(self):
-        pass
+        # Display the scores screen
+        imgBackground = cv2.imread("FinalProject_GesturesPong/images/backgroundPong.png")
+        highest_score = self.get_higher_score()
+        prev_x_positions = []
+        
+        while True:
+            ret, frame = self.cap.read()
+            if not ret:
+                break
+            frame = cv2.flip(frame, 1)
+            rawFrame = frame
+            frame = cv2.addWeighted(frame, 0.5, imgBackground, 0.5, 0)
+            frame = cvzone.overlayPNG(frame, self.images["PontuacoesText"], [150, -120])
+            cv2.putText(frame, f"Highest Score: {highest_score}", (400, 300), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
+            cv2.putText(frame, "Swipe Left to return to the menu", (400, 500), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
+
+            # Process hands using mediapipe
+            results = self.hands.process(cv2.cvtColor(rawFrame, cv2.COLOR_BGR2RGB))
+            if results.multi_hand_landmarks:
+                for hand_landmarks in results.multi_hand_landmarks:
+                    self.mp_drawing.draw_landmarks(frame, hand_landmarks, self.mp_hands.HAND_CONNECTIONS)
+
+                    x_positions = [lm.x for lm in hand_landmarks.landmark]
+                    if prev_x_positions:
+                        movement = [curr - prev for curr, prev in zip(x_positions, prev_x_positions)]
+                        if all(m < -0.02 for m in movement):  
+                            return
+                    prev_x_positions = x_positions
+
+            cv2.imshow('Pong Project', frame)
+            if cv2.pollKey() != -1:
+                break
+        
+        
+    def get_higher_score(self):
+        scorefilepath = "FinalProject_GesturesPong/highestScore.txt"
+
+        # Lê maior score
+        if os.path.exists(scorefilepath):
+            with open(scorefilepath, 'r') as file:
+                try:
+                    return int(file.read().strip())
+                except ValueError:
+                    return 0  # If no value
+        else:
+            return 0
 
 
     def __result_callback(self, result, output_image, timestamp_ms):
@@ -280,21 +353,10 @@ class GestureRecognizer:
         
         
 
-    def update_highest_score(self, score):
-        # Nome do ficheiro para guardar o maior score
+    def update_highest_score(self, score, highest_score):
         scorefilepath = "FinalProject_GesturesPong/highestScore.txt"
 
-        # Verificar o maior score atual no ficheiro
-        if os.path.exists(scorefilepath):
-            with open(scorefilepath, 'r') as file:
-                try:
-                    highest_score = int(file.read().strip())
-                except ValueError:
-                    highest_score = 0  # If no value
-        else:
-            highest_score = 0
-
-        # Atualizar o ficheiro se o score atual for maior
+        # Atualizar ficheiro se o score atual for maior
         if score > highest_score:
             with open(scorefilepath, 'w') as file:
                 file.write(str(score))
