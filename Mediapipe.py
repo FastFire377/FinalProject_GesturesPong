@@ -221,7 +221,7 @@ class GestureRecognizer:
 
         if result and result.gestures:
             gesture_name = result.gestures[0][0].category_name
-            print("gesture name:", gesture_name)
+            # print("gesture name:", gesture_name)
             current_time = time.time()
             if gesture_name in self.menuOptions:
                 
@@ -253,6 +253,7 @@ class GestureRecognizer:
         imgBlock2 = cv2.imread("FinalProject_GesturesPong/images/Bloco2.png", cv2.IMREAD_UNCHANGED)
         
         self.current_gestures = []
+        highest_score = self.get_higher_score()
 
         ballPos = [100, 100]
         speedX = 15
@@ -310,7 +311,7 @@ class GestureRecognizer:
             if ballPos[0] < 40 or ballPos[0] > 1260:
                 gameOver = True
                 self.current_gestures = []
-                self.update_highest_score(score[1] + score[0])
+                self.update_highest_score(score[1] + score[0], highest_score)
                 ballPos = [100, 100]
                 speedX, speedY = 15, 15
                 score = [0, 0]
